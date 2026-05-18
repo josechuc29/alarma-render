@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel · Alarma</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0e0e0f;--surface:#17171a;--surface2:#1e1e22;--border:#2a2a2e;
+  --accent:#e8c97e;--accent2:#c4a35a;--text:#f0ede8;--muted:#7a7875;--muted2:#4a4845;
+  --danger:#e05c5c;--success:#5cb88a;
+}
+html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 40% at 50% -10%,rgba(232,201,126,.05) 0%,transparent 60%);pointer-events:none;z-index:0}
+.app{display:grid;grid-template-rows:auto 1fr;min-height:100vh;position:relative;z-index:1}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:60px;border-bottom:1px solid var(--border);background:rgba(14,14,15,.85);backdrop-filter:blur(12px);position:sticky;top:0;z-index:100}
+.logo{font-family:'DM Serif Display',serif;font-size:20px;color:var(--accent)}
+.header-right{display:flex;align-items:center;gap:20px}
+.live-dot{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--success);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+.btn-logout{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:6px;transition:color .2s,border-color .2s}
+.btn-logout:hover{color:var(--text);border-color:var(--muted2)}
+main{padding:32px;display:flex;flex-direction:column;gap:28px;max-width:1200px;width:100%;margin:0 auto}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px 28px;transition:border-color .2s}
+.stat-card:hover{border-color:var(--muted2)}
+.stat-label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+.stat-value{font-family:'DM Serif Display',serif;font-size:42px;color:var(--text);line-height:1;margin-bottom:4px}
+.stat-value.accent{color:var(--accent)}
+.stat-sub{font-size:12px;color:var(--muted)}
+.chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px}
+.section-title{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:24px}
+.chart{height:140px;display:flex;align-items:flex-end;gap:8px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%}
+.bar-outer{flex:1;width:100%;display:flex;align-items:flex-end}
+.bar-inner{width:100%;border-radius:4px 4px 0 0;background:var(--accent);opacity:.25;transition:height .6s cubic-bezier(.34,1.56,.64,1),opacity .2s;min-height:2px}
+.bar-inner.active{opacity:.85}
+.bar-inner:hover{opacity:1}
+.bar-label{font-size:10px;color:var(--muted);white-space:nowrap}
+.bar-count{font-size:11px;color:var(--accent);font-weight:500;min-height:16px}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.table-header{display:flex;align-items:center;justify-content:space-between;padding:20px 28px;border-bottom:1px solid var(--border)}
+.table-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead th{padding:12px 28px;text-align:left;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);font-weight:400}
+tbody tr{border-bottom:1px solid rgba(42,42,46,.6);transition:background .15s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--surface2)}
+tbody tr.new-row{animation:rowIn .4s ease forwards}
+@keyframes rowIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+td{padding:14px 28px;font-size:13px;color:var(--text)}
+td.muted{color:var(--muted);font-size:12px}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;letter-spacing:.5px;background:rgba(232,201,126,.1);color:var(--accent);border:1px solid rgba(232,201,126,.2)}
+.empty{padding:48px 28px;text-align:center;color:var(--muted);font-size:13px}
+.count-badge{background:var(--accent);color:#0e0e0f;font-size:11px;font-weight:500;padding:2px 8px;border-radius:10px;min-width:20px;text-align:center}
+@media(max-width:600px){main{padding:16px}.stats{grid-template-columns:1fr}header{padding:0 16px}thead th,td{padding:10px 16px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <span class="logo">Alarma</span>
+    <div class="header-right">
+      <span class="live-dot"><span class="dot"></span>En vivo</span>
+      <a href="/logout" class="btn-logout">Salir</a>
+    </div>
+  </header>
+  <main>
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-label">Total alertas</div>
+        <div class="stat-value accent" id="stat-total">—</div>
+        <div class="stat-sub">Desde el inicio</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Hoy</div>
+        <div class="stat-value" id="stat-hoy">—</div>
+        <div class="stat-sub">Activaciones del día</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Última alerta</div>
+        <div class="stat-value" id="stat-ultima" style="font-size:20px;padding-top:8px">—</div>
+        <div class="stat-sub" id="stat-ultima-sub">—</div>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <div class="section-title">Activaciones — últimos 7 días</div>
+      <div class="chart" id="chart"></div>
+    </div>
+    <div class="table-wrap">
+      <div class="table-header">
+        <span class="section-title" style="margin:0">Historial de eventos</span>
+        <span class="count-badge" id="count-badge">0</span>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>#</th><th>Dispositivo</th><th>Evento</th><th>Fecha y hora</th></tr></thead>
+          <tbody id="tbody"><tr><td colspan="4" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+let lastId=0;
+function fmtDate(str){
+  if(!str)return'—';
+  const d=new Date(str);
+  return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+function fmtShort(str){
+  if(!str)return'—';
+  const d=new Date(str),now=new Date(),diff=Math.floor((now-d)/1000);
+  if(diff<60)return'Hace '+diff+'s';
+  if(diff<3600)return'Hace '+Math.floor(diff/60)+'min';
+  return d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+}
+function renderChart(data){
+  const chart=document.getElementById('chart');
+  if(!data||!data.length){chart.innerHTML='<span style="color:var(--muted);font-size:12px">Sin datos aún</span>';return;}
+  const max=Math.max(...data.map(d=>parseInt(d.total)),1);
+  const days=[];
+  for(let i=6;i>=0;i--){
+    const d=new Date();d.setDate(d.getDate()-i);
+    const key=d.toISOString().split('T')[0];
+    const found=data.find(r=>r.dia&&r.dia.startsWith(key));
+    days.push({label:d.toLocaleDateString('es-MX',{weekday:'short'}),total:found?parseInt(found.total):0,isToday:i===0});
+  }
+  chart.innerHTML=days.map(d=>`
+    <div class="bar-col">
+      <div class="bar-count">${d.total||''}</div>
+      <div class="bar-outer">
+        <div class="bar-inner${d.isToday?' active':''}" style="height:${Math.max(d.total/max*100,d.total?2:0)}%" title="${d.total} alertas"></div>
+      </div>
+      <div class="bar-label">${d.label}</div>
+    </div>`).join('');
+}
+function renderRows(rows){
+  const tbody=document.getElementById('tbody');
+  if(!rows||!rows.length){tbody.innerHTML='<tr><td colspan="4" class="empty">Sin registros aún</td></tr>';return;}
+  document.getElementById('count-badge').textContent=rows.length;
+  const newMaxId=Math.max(...rows.map(r=>parseInt(r.id)));
+  tbody.innerHTML=rows.map(r=>`
+    <tr class="${parseInt(r.id)>lastId&&lastId>0?'new-row':''}">
+      <td class="muted">${r.id}</td>
+      <td><span class="badge">${r.dispositivo_id}</span></td>
+      <td>${r.evento}</td>
+      <td class="muted">${fmtDate(r.fecha_hora)}</td>
+    </tr>`).join('');
+  lastId=newMaxId;
+}
+async function fetchData(){
+  try{
+    const res=await fetch('/api/datos');
+    const data=await res.json();
+    if(data.error)return;
+    document.getElementById('stat-total').textContent=data.total||0;
+    document.getElementById('stat-hoy').textContent=data.hoy||0;
+    document.getElementById('stat-ultima').textContent=data.ultima?new Date(data.ultima).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}):'—';
+    document.getElementById('stat-ultima-sub').textContent=fmtShort(data.ultima);
+    renderChart(data.grafica);
+    renderRows(data.rows);
+  }catch(e){console.error(e);}
+}
+fetchData();
+setInterval(fetchData,5000);
+</script>
+</body>
+</html>
