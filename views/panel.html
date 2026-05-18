@@ -24,6 +24,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 3
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
 .btn-logout{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:6px;transition:color .2s,border-color .2s}
 .btn-logout:hover{color:var(--text);border-color:var(--muted2)}
+.btn-sound{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:6px 12px;border:1px solid var(--border);border-radius:6px;transition:color .2s,border-color .2s;cursor:pointer;background:none}
+.btn-sound.active{color:var(--accent);border-color:var(--accent)}
 main{padding:32px;display:flex;flex-direction:column;gap:28px;max-width:1200px;width:100%;margin:0 auto}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px 28px;transition:border-color .2s}
@@ -57,6 +59,8 @@ td.muted{color:var(--muted);font-size:12px}
 .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;letter-spacing:.5px;background:rgba(232,201,126,.1);color:var(--accent);border:1px solid rgba(232,201,126,.2)}
 .empty{padding:48px 28px;text-align:center;color:var(--muted);font-size:13px}
 .count-badge{background:var(--accent);color:#0e0e0f;font-size:11px;font-weight:500;padding:2px 8px;border-radius:10px;min-width:20px;text-align:center}
+.alert-flash{animation:flash .6s ease}
+@keyframes flash{0%{background:rgba(232,201,126,.15)}100%{background:transparent}}
 @media(max-width:600px){main{padding:16px}.stats{grid-template-columns:1fr}header{padding:0 16px}thead th,td{padding:10px 16px}}
 </style>
 </head>
@@ -66,6 +70,7 @@ td.muted{color:var(--muted);font-size:12px}
     <span class="logo">Alarma</span>
     <div class="header-right">
       <span class="live-dot"><span class="dot"></span>En vivo</span>
+      <button class="btn-sound active" id="btn-sound" onclick="toggleSound()" title="Activar/desactivar sonido">🔔 Sonido</button>
       <a href="/logout" class="btn-logout">Salir</a>
     </div>
   </header>
@@ -105,69 +110,113 @@ td.muted{color:var(--muted);font-size:12px}
     </div>
   </main>
 </div>
+
+<!-- Audio de alerta -->
+<audio id="alerta-audio" preload="auto">
+  <source src="/alerta.mp3" type="audio/mpeg">
+</audio>
+
 <script>
-let lastId=0;
-function fmtDate(str){
-  if(!str)return'—';
-  const d=new Date(str);
-  return d.toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+let lastId = 0;
+let soundEnabled = true;
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  const btn = document.getElementById('btn-sound');
+  btn.textContent = soundEnabled ? '🔔 Sonido' : '🔕 Silencio';
+  btn.classList.toggle('active', soundEnabled);
 }
-function fmtShort(str){
-  if(!str)return'—';
-  const d=new Date(str),now=new Date(),diff=Math.floor((now-d)/1000);
-  if(diff<60)return'Hace '+diff+'s';
-  if(diff<3600)return'Hace '+Math.floor(diff/60)+'min';
-  return d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+
+function playAlerta() {
+  if (!soundEnabled) return;
+  const audio = document.getElementById('alerta-audio');
+  audio.currentTime = 0;
+  audio.play().catch(() => {});
 }
-function renderChart(data){
-  const chart=document.getElementById('chart');
-  if(!data||!data.length){chart.innerHTML='<span style="color:var(--muted);font-size:12px">Sin datos aún</span>';return;}
-  const max=Math.max(...data.map(d=>parseInt(d.total)),1);
-  const days=[];
-  for(let i=6;i>=0;i--){
-    const d=new Date();d.setDate(d.getDate()-i);
-    const key=d.toISOString().split('T')[0];
-    const found=data.find(r=>r.dia&&r.dia.startsWith(key));
-    days.push({label:d.toLocaleDateString('es-MX',{weekday:'short'}),total:found?parseInt(found.total):0,isToday:i===0});
+
+function fmtDate(str) {
+  if (!str) return '—';
+  const d = new Date(str);
+  return d.toLocaleDateString('es-MX', {day:'2-digit',month:'short',year:'numeric'})
+       + ' ' + d.toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+function fmtShort(str) {
+  if (!str) return '—';
+  const d = new Date(str), now = new Date(), diff = Math.floor((now - d) / 1000);
+  if (diff < 60) return 'Hace ' + diff + 's';
+  if (diff < 3600) return 'Hace ' + Math.floor(diff/60) + 'min';
+  return d.toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'});
+}
+
+function renderChart(data) {
+  const chart = document.getElementById('chart');
+  if (!data || !data.length) {
+    chart.innerHTML = '<span style="color:var(--muted);font-size:12px">Sin datos aún</span>';
+    return;
   }
-  chart.innerHTML=days.map(d=>`
+  const max = Math.max(...data.map(d => parseInt(d.total)), 1);
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = d.toISOString().split('T')[0];
+    const found = data.find(r => r.dia && r.dia.startsWith(key));
+    days.push({ label: d.toLocaleDateString('es-MX', {weekday:'short'}), total: found ? parseInt(found.total) : 0, isToday: i === 0 });
+  }
+  chart.innerHTML = days.map(d => `
     <div class="bar-col">
-      <div class="bar-count">${d.total||''}</div>
+      <div class="bar-count">${d.total || ''}</div>
       <div class="bar-outer">
-        <div class="bar-inner${d.isToday?' active':''}" style="height:${Math.max(d.total/max*100,d.total?2:0)}%" title="${d.total} alertas"></div>
+        <div class="bar-inner${d.isToday ? ' active' : ''}" style="height:${Math.max(d.total/max*100, d.total?2:0)}%" title="${d.total} alertas"></div>
       </div>
       <div class="bar-label">${d.label}</div>
     </div>`).join('');
 }
-function renderRows(rows){
-  const tbody=document.getElementById('tbody');
-  if(!rows||!rows.length){tbody.innerHTML='<tr><td colspan="4" class="empty">Sin registros aún</td></tr>';return;}
-  document.getElementById('count-badge').textContent=rows.length;
-  const newMaxId=Math.max(...rows.map(r=>parseInt(r.id)));
-  tbody.innerHTML=rows.map(r=>`
-    <tr class="${parseInt(r.id)>lastId&&lastId>0?'new-row':''}">
+
+function renderRows(rows) {
+  const tbody = document.getElementById('tbody');
+  if (!rows || !rows.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">Sin registros aún</td></tr>';
+    return;
+  }
+  document.getElementById('count-badge').textContent = rows.length;
+  const newMaxId = Math.max(...rows.map(r => parseInt(r.id)));
+
+  // Reproduce sonido y flash cuando hay alerta nueva
+  if (lastId > 0 && newMaxId > lastId) {
+    playAlerta();
+    document.querySelector('header').classList.add('alert-flash');
+    setTimeout(() => document.querySelector('header').classList.remove('alert-flash'), 600);
+  }
+
+  tbody.innerHTML = rows.map(r => `
+    <tr class="${parseInt(r.id) > lastId && lastId > 0 ? 'new-row' : ''}">
       <td class="muted">${r.id}</td>
       <td><span class="badge">${r.dispositivo_id}</span></td>
       <td>${r.evento}</td>
       <td class="muted">${fmtDate(r.fecha_hora)}</td>
     </tr>`).join('');
-  lastId=newMaxId;
+  lastId = newMaxId;
 }
-async function fetchData(){
-  try{
-    const res=await fetch('/api/datos');
-    const data=await res.json();
-    if(data.error)return;
-    document.getElementById('stat-total').textContent=data.total||0;
-    document.getElementById('stat-hoy').textContent=data.hoy||0;
-    document.getElementById('stat-ultima').textContent=data.ultima?new Date(data.ultima).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}):'—';
-    document.getElementById('stat-ultima-sub').textContent=fmtShort(data.ultima);
+
+async function fetchData() {
+  try {
+    const res = await fetch('/api/datos');
+    const data = await res.json();
+    if (data.error) return;
+    document.getElementById('stat-total').textContent = data.total || 0;
+    document.getElementById('stat-hoy').textContent   = data.hoy   || 0;
+    document.getElementById('stat-ultima').textContent = data.ultima
+      ? new Date(data.ultima).toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit'})
+      : '—';
+    document.getElementById('stat-ultima-sub').textContent = fmtShort(data.ultima);
     renderChart(data.grafica);
     renderRows(data.rows);
-  }catch(e){console.error(e);}
+  } catch(e) { console.error(e); }
 }
+
 fetchData();
-setInterval(fetchData,5000);
+setInterval(fetchData, 5000);
 </script>
 </body>
 </html>
